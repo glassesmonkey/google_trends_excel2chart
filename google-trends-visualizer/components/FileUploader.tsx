@@ -8,7 +8,7 @@ import { TrendsData, ComparisonPoint } from '../types'
 const GPTS_DAILY_VOLUME = 5000 // GPTs 基准搜索量
 
 export default function FileUploader() {
-  const { addTrendsData, setUploadState } = useStore()
+  const { addTrendsData } = useStore()
   const [processing, setProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
 

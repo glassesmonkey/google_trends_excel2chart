@@ -8,12 +8,6 @@ interface TrendsChartProps {
   data: TrendsData
 }
 
-interface PeriodData {
-  startDate: string
-  endDate: string
-  avgValue: number
-}
-
 // 格式化数字为 K, M, B
 const formatNumber = (num: number): string => {
   if (num >= 1000000000) {
@@ -52,7 +46,7 @@ const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
   // 计算历史期的平均值
   const historicalAvg = periodsData.slice(0, -1).reduce((sum, val) => sum + val, 0) / (PERIODS - 1)
   
-  // 计算趋势（是否上升）
+  // 计算趋势���是否上升）
   const trend = periodsData.every((val, i) => 
     i === 0 || val >= periodsData[i - 1] * 0.8  // 允许20%的波动
   ) ? 1 : 0
@@ -64,6 +58,11 @@ const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
   return Math.round(
     (recentScore * RECENT_WEIGHT + trendScore * TREND_WEIGHT) / (RECENT_WEIGHT + TREND_WEIGHT)
   )
+}
+
+interface TooltipParams {
+  axisValue: string
+  // 添加其他可能需要的属性
 }
 
 export default function TrendsChart({ data }: TrendsChartProps) {
@@ -117,7 +116,7 @@ export default function TrendsChart({ data }: TrendsChartProps) {
       ],
       tooltip: {
         trigger: 'axis',
-        formatter: function (params: any[]) {
+        formatter: function (params: TooltipParams[]) {
           const date = params[0].axisValue
           const point = data.comparisonData.find(p => p.date === date)
           if (!point) return ''

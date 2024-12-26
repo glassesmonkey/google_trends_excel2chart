@@ -1,3 +1,5 @@
+import { TrendsData } from '../types'
+
 const DATA_FOLDER_NAME = 'GoogleTrendsVisualizer'
 
 class GoogleDriveService {
@@ -73,7 +75,7 @@ class GoogleDriveService {
     return folder.id
   }
 
-  async saveData(data: any) {
+  async saveData(data: TrendsData[]) {
     if (!this.token) throw new Error('Not authenticated')
     
     if (!this.folderId) {
