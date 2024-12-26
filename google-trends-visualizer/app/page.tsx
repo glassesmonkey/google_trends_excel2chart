@@ -26,25 +26,28 @@ export default function Home() {
   useEffect(() => {
     const initGoogleDrive = async () => {
       // 尝试恢复已保存的凭证
-      if (googleDriveService.restoreTokens()) {
+      if (googleDriveService.restoreToken()) {
         setAuthenticated(true)
         await loadFromDrive()
         return
       }
 
-      // 检查 URL 中是否有授权码
-      const urlParams = new URLSearchParams(window.location.search)
-      const code = urlParams.get('code')
-      
-      if (code) {
-        try {
-          await googleDriveService.setCredentials(code)
-          setAuthenticated(true)
-          await loadFromDrive()
-          // 清除 URL 中的授权码
-          window.history.replaceState({}, '', '/')
-        } catch (error) {
-          console.error('Google Drive 认证失败:', error)
+      // 检查 URL 中是否有访问令牌
+      const hash = window.location.hash
+      if (hash) {
+        const params = new URLSearchParams(hash.substring(1))
+        const accessToken = params.get('access_token')
+        
+        if (accessToken) {
+          try {
+            googleDriveService.setToken(accessToken)
+            setAuthenticated(true)
+            await loadFromDrive()
+            // 清除 URL 中的令牌
+            window.history.replaceState({}, '', window.location.pathname)
+          } catch (error) {
+            console.error('Google Drive 认证失败:', error)
+          }
         }
       }
     }
