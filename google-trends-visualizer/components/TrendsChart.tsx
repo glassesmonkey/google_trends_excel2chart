@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
-import { TrendsData, ComparisonPoint } from '../types'
+import { TrendsData } from '../types'
 import { calculateFreshnessScore } from '../utils/calculations'
 
 interface TrendsChartProps {

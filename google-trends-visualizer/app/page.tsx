@@ -6,7 +6,6 @@ import FileUploader from '../components/FileUploader'
 import TrendsChart from '../components/TrendsChart'
 import { useInView } from 'react-intersection-observer'
 import { googleDriveService } from '../lib/googleDrive'
-import { TrendsData } from '../types'
 import { calculateFreshnessScore } from '../utils/calculations'
 
 const ITEMS_PER_PAGE = 12
@@ -148,17 +147,6 @@ export default function Home() {
     } else {
       setSortField(field)
       setSortOrder('desc')
-    }
-  }
-
-  // 在处理 OAuth 回调的地方
-  const handleOAuthCallback = (hash: string) => {
-    const params = new URLSearchParams(hash.substring(1))
-    const accessToken = params.get('access_token')
-    const expiresIn = parseInt(params.get('expires_in') || '3600')
-    
-    if (accessToken) {
-      googleDriveService.setToken(accessToken, expiresIn)
     }
   }
 
