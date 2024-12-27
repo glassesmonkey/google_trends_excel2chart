@@ -116,7 +116,7 @@ export default function Home() {
           await loadFromDrive()
         } catch (error) {
           console.error('加载 Drive 数据失败:', error)
-          // 如果加载失败，可能是 token 失效
+          // 如果加载失���，可能是 token 失效
           setAuthenticated(false)
         }
       } else {
@@ -210,10 +210,10 @@ export default function Home() {
           </div>
         </div>
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAndSortedData.slice(0, displayCount).map((data) => (
-            <div key={data.id} className="bg-white rounded-lg shadow-sm p-3">
-              <h2 className="text-sm font-medium mb-2 truncate">
+            <div key={data.id} className="bg-white rounded-lg shadow-sm p-4">
+              <h2 className="text-sm font-medium mb-3 truncate">
                 {data.targetKeyword}
               </h2>
               <TrendsChart data={data} />

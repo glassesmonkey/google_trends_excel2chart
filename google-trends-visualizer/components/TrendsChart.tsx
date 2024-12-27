@@ -28,6 +28,12 @@ interface TooltipParams {
   // 添加其他可能需要的属性
 }
 
+// 添加日期格式化函数
+const formatDate = (dateStr: string): string => {
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}月`  // 只显示月份
+}
+
 export default function TrendsChart({ data }: TrendsChartProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<echarts.ECharts | null>(null)
@@ -70,22 +76,22 @@ export default function TrendsChart({ data }: TrendsChartProps) {
         {
           text: data.chartConfig?.title,
           left: 'center',
-          top: 5,
+          top: 0,
           textStyle: {
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 'normal'
           }
         },
         {
           text: [
-            `月均搜索量: ${formatNumber(averageMonthlyVolume)}`,
+            `月均: ${formatNumber(averageMonthlyVolume)}`,
             `新鲜度: ${freshnessScore}%`,
-            `近7天日均: ${formatNumber(data.lastWeekVolume || 0)}`
-          ].join('    '),
-          top: 30,
+            `近7日: ${formatNumber(data.lastWeekVolume || 0)}`
+          ].join('  '),
+          top: 20,
           left: 'center',
           textStyle: {
-            fontSize: 12,
+            fontSize: 11,
             color: '#666',
             fontWeight: 'normal'
           }
@@ -98,9 +104,12 @@ export default function TrendsChart({ data }: TrendsChartProps) {
           const point = data.comparisonData.find(p => p.date === date)
           if (!point) return ''
           
+          // 在悬停时显示完整日期
+          const fullDate = new Date(date).toLocaleDateString('zh-CN')  // 2023年12月24日 格式
+          
           return `
             <div class="font-sans text-sm">
-              <div class="font-bold">${date}</div>
+              <div class="font-bold">${fullDate}</div>
               <div>GPTs: ${point.gpts}</div>
               <div>${data.targetKeyword}: ${point.keyword}</div>
               <div class="mt-1 pt-1 border-t text-xs">
@@ -120,7 +129,7 @@ export default function TrendsChart({ data }: TrendsChartProps) {
         }
       },
       grid: {
-        top: 80,  // 增加顶部空间以容纳新的指标
+        top: 70,
         left: '8%',
         right: '8%',
         bottom: '12%',
@@ -133,7 +142,8 @@ export default function TrendsChart({ data }: TrendsChartProps) {
         axisLabel: {
           fontSize: 10,
           interval: 'auto',
-          rotate: 45
+          formatter: (value: string) => formatDate(value),  // 使用格式化函数
+          rotate: 30  // 可以减小旋转角度，因为文字变短了
         }
       },
       yAxis: {
