@@ -55,18 +55,18 @@ export default function FileUploader() {
         0
       ) / comparisonData.length
 
-      // 如果月均搜索量为0，则跳过这个文件
-      if (averageMonthlyVolume === 0) {
-        console.log(`跳过文件 ${file.name}: 月均搜索量为0`)
-        return null
-      }
-
       // 计算最后7天的平均搜索量
       const lastWeekData = comparisonData.slice(-2)  // 获取最后两个数据点
       const lastWeekVolume = Math.round(
         lastWeekData.reduce((sum, point) => sum + point.dailyVolume, 0) / 
         lastWeekData.length
       )
+
+      // 修改过滤条件：只有当月均和近7日均值都为0时才跳过
+      if (averageMonthlyVolume === 0 && lastWeekVolume === 0) {
+        console.log(`跳过文件 ${file.name}: 月均搜索量和近7日均值都为0`)
+        return null
+      }
 
       return {
         id: crypto.randomUUID(),
