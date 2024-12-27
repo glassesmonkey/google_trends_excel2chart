@@ -1,46 +1,35 @@
 import { ComparisonPoint, TrendsData } from '../types'
 
 export const calculateFreshnessScore = (comparisonData: ComparisonPoint[]): number => {
-  // 添加防护检查
   if (!comparisonData || comparisonData.length === 0) {
-    console.warn('No comparison data available')
     return 0
   }
 
-  const data = comparisonData
-
-  // 添加详细的调试日志
-  console.log('calculateFreshnessScore received:', {
-    comparisonData,
-    dataLength: data.length
-  })
-
-  const maxScore = 100
-
-  // 按时间排序，找出数据集中的最新日期
-  const sortedData = [...data].sort((a, b) => 
+  const sortedData = [...comparisonData].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   )
 
-  // 按时间段分组检查流量
+  const latestDate = new Date(sortedData[0].date)
+  
+  // 计算平均流量作为基准
+  const avgTraffic = sortedData.reduce((sum, point) => sum + point.keyword, 0) / sortedData.length
+  // 设置流量阈值为平均流量的10%
+  const trafficThreshold = avgTraffic * 0.1
+
   const periods = [
-    { days: 7, score: 100 },    // 只在最近7天有流量
-    { days: 14, score: 90 },    // 只在最近14天有流量
-    { days: 30, score: 80 },    // 只在最近30天有流量
-    { days: 60, score: 60 },    // 只在最近60天有流量
-    { days: 90, score: 40 },    // 只在最近90天有流量
-    { days: 180, score: 20 },   // 只在最近180天有流量
-    { days: Infinity, score: 10 } // 更早就有流量
+    { days: 7, score: 100 },
+    { days: 14, score: 90 },
+    { days: 30, score: 80 },
+    { days: 60, score: 60 },
+    { days: 90, score: 40 },
+    { days: 180, score: 20 },
+    { days: Infinity, score: 10 }
   ]
 
-  const latestDate = new Date(sortedData[0].date)
-
-  // 遍历每个时间段
   for (const period of periods) {
     const cutoffDate = new Date(latestDate)
     cutoffDate.setDate(cutoffDate.getDate() - period.days)
 
-    // 分割数据为当前时间段和之前的数据
     const recentData = sortedData.filter(point => 
       new Date(point.date) > cutoffDate
     )
@@ -48,32 +37,23 @@ export const calculateFreshnessScore = (comparisonData: ComparisonPoint[]): numb
       new Date(point.date) <= cutoffDate
     )
 
-    // 检查当前时间段是否有流量
-    const hasRecentTraffic = recentData.some(point => point.keyword > 0)
-    // 检查之前时间段是否都没有流量
-    const hasOlderTraffic = olderData.some(point => point.keyword > 0)
+    // 计算当前时段的平均流量
+    const recentAvg = recentData.reduce((sum, point) => sum + point.keyword, 0) / recentData.length
+    // 计算历史时段的平均流量
+    const olderAvg = olderData.length ? 
+      olderData.reduce((sum, point) => sum + point.keyword, 0) / olderData.length : 
+      0
 
-    // 如果只在当前时间段有流量，之前都没有，就用这个分数
-    if (hasRecentTraffic && !hasOlderTraffic) {
-      console.log('新鲜度计算:', {
-        latestDataDate: latestDate.toISOString(),
-        periodDays: period.days,
-        score: period.score,
-        hasRecentTraffic,
-        hasOlderTraffic,
-        recentData: recentData.map(p => ({
-          date: p.date,
-          value: p.keyword
-        })),
-        olderData: olderData.map(p => ({
-          date: p.date,
-          value: p.keyword
-        }))
-      })
+    // 检查是否符合"新兴趋势"的条件：
+    // 1. 当前时段平均流量超过阈值
+    // 2. 当前时段的流量显著高于历史时段（比如是历史的2倍以上）
+    const hasSignificantRecentTraffic = recentAvg > trafficThreshold
+    const isSignificantIncrease = olderAvg === 0 || (recentAvg / olderAvg >= 2)
+
+    if (hasSignificantRecentTraffic && isSignificantIncrease) {
       return period.score
     }
   }
 
-  // 如果所有时期都有流量，返回最低分
   return 10
 } 
