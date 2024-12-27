@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
 import { TrendsData, ComparisonPoint } from '../types'
+import { calculateFreshnessScore } from '../utils/calculations'
 
 interface TrendsChartProps {
   data: TrendsData
@@ -22,44 +23,6 @@ const formatNumber = (num: number): string => {
   return num.toString()
 }
 
-// 计算新鲜度分数（0-100）
-const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
-  const RECENT_WEIGHT = 2  // 最近数据的权重
-  const TREND_WEIGHT = 1   // 趋势的权重
-  const PERIODS = 4        // 将数据分为4个时期
-
-  // 将数据分成几个时期
-  const periodsData: number[] = []
-  const periodLength = Math.floor(data.length / PERIODS)
-  
-  for (let i = 0; i < PERIODS; i++) {
-    const start = i * periodLength
-    const end = i === PERIODS - 1 ? data.length : (i + 1) * periodLength
-    const periodData = data.slice(start, end)
-    const avgValue = periodData.reduce((sum, p) => sum + p.keyword, 0) / periodData.length
-    periodsData.push(avgValue)
-  }
-
-  // 计算最近期的平均值
-  const recentAvg = periodsData[PERIODS - 1]
-  
-  // 计算历史期的平均值
-  const historicalAvg = periodsData.slice(0, -1).reduce((sum, val) => sum + val, 0) / (PERIODS - 1)
-  
-  // 计算趋势���是否上升）
-  const trend = periodsData.every((val, i) => 
-    i === 0 || val >= periodsData[i - 1] * 0.8  // 允许20%的波动
-  ) ? 1 : 0
-
-  // 计算新鲜度分数
-  const recentScore = Math.min(100, (recentAvg / historicalAvg) * 50) || 0
-  const trendScore = trend * 50
-
-  return Math.round(
-    (recentScore * RECENT_WEIGHT + trendScore * TREND_WEIGHT) / (RECENT_WEIGHT + TREND_WEIGHT)
-  )
-}
-
 interface TooltipParams {
   axisValue: string
   // 添加其他可能需要的属性
@@ -75,7 +38,7 @@ export default function TrendsChart({ data }: TrendsChartProps) {
     data.comparisonData.length
   )
 
-  // 计算新鲜度分数
+  // 使用新的计算函数
   const freshnessScore = calculateFreshnessScore(data.comparisonData)
 
   useEffect(() => {

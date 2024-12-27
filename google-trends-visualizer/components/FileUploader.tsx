@@ -49,6 +49,18 @@ export default function FileUploader() {
         throw new Error(`文件 ${file.name} 没有有效的数据行`)
       }
 
+      // 计算平均月搜索量
+      const averageMonthlyVolume = comparisonData.reduce(
+        (sum, point) => sum + point.monthlyVolume, 
+        0
+      ) / comparisonData.length
+
+      // 如果月均搜索量为0，则跳过这个文件
+      if (averageMonthlyVolume === 0) {
+        console.log(`跳过文件 ${file.name}: 月均搜索量为0`)
+        return null
+      }
+
       return {
         id: crypto.randomUUID(),
         timestamp: Date.now(),

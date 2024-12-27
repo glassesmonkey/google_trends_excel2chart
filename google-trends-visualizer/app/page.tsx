@@ -6,50 +6,13 @@ import FileUploader from '../components/FileUploader'
 import TrendsChart from '../components/TrendsChart'
 import { useInView } from 'react-intersection-observer'
 import { googleDriveService } from '../lib/googleDrive'
-import { TrendsData, ComparisonPoint } from '../types'
+import { TrendsData } from '../types'
+import { calculateFreshnessScore } from '../utils/calculations'
 
 const ITEMS_PER_PAGE = 12
 
 type SortField = 'monthlyVolume' | 'freshness' | 'timestamp'
 type SortOrder = 'asc' | 'desc'
-
-// 从 TrendsChart 组件复制过来的计算新鲜度函数
-const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
-  const RECENT_WEIGHT = 2  // 最近数据的权重
-  const TREND_WEIGHT = 1   // 趋势的权重
-  const PERIODS = 4        // 将数据分为4个时期
-
-  // 将数据分成几个时期
-  const periodsData: number[] = []
-  const periodLength = Math.floor(data.length / PERIODS)
-  
-  for (let i = 0; i < PERIODS; i++) {
-    const start = i * periodLength
-    const end = i === PERIODS - 1 ? data.length : (i + 1) * periodLength
-    const periodData = data.slice(start, end)
-    const avgValue = periodData.reduce((sum, p) => sum + p.keyword, 0) / periodData.length
-    periodsData.push(avgValue)
-  }
-
-  // 计算最近期的平均值
-  const recentAvg = periodsData[PERIODS - 1]
-  
-  // 计算历史期的平均值
-  const historicalAvg = periodsData.slice(0, -1).reduce((sum, val) => sum + val, 0) / (PERIODS - 1)
-  
-  // 计算趋势（是否上升）
-  const trend = periodsData.every((val, i) => 
-    i === 0 || val >= periodsData[i - 1] * 0.8  // 允许20%的波动
-  ) ? 1 : 0
-
-  // 计算新鲜度分数
-  const recentScore = Math.min(100, (recentAvg / historicalAvg) * 50) || 0
-  const trendScore = trend * 50
-
-  return Math.round(
-    (recentScore * RECENT_WEIGHT + trendScore * TREND_WEIGHT) / (RECENT_WEIGHT + TREND_WEIGHT)
-  )
-}
 
 export default function Home() {
   const { 
@@ -111,30 +74,43 @@ export default function Home() {
   // 处理 Google Drive 认证
   useEffect(() => {
     const initGoogleDrive = async () => {
-      // 尝试恢复已保存的凭证
-      if (googleDriveService.restoreToken()) {
-        setAuthenticated(true)
-        await loadFromDrive()
-        return
-      }
-
       // 检查 URL 中是否有访问令牌
       const hash = window.location.hash
       if (hash) {
         const params = new URLSearchParams(hash.substring(1))
         const accessToken = params.get('access_token')
+        const expiresIn = parseInt(params.get('expires_in') || '3600')
         
         if (accessToken) {
           try {
-            googleDriveService.setToken(accessToken)
+            console.log('Setting new token from URL')
+            googleDriveService.setToken(accessToken, expiresIn)
             setAuthenticated(true)
             await loadFromDrive()
             // 清除 URL 中的令牌
             window.history.replaceState({}, '', window.location.pathname)
+            return
           } catch (error) {
             console.error('Google Drive 认证失败:', error)
           }
         }
+      }
+
+      // 尝��恢复已保存的凭证
+      console.log('Trying to restore token')
+      if (googleDriveService.restoreToken()) {
+        console.log('Token restored successfully')
+        setAuthenticated(true)
+        try {
+          await loadFromDrive()
+        } catch (error) {
+          console.error('加载 Drive 数据失败:', error)
+          // 如果加载失败，可能是 token 失效
+          setAuthenticated(false)
+        }
+      } else {
+        console.log('No valid token found')
+        setAuthenticated(false)
       }
     }
 
@@ -160,6 +136,17 @@ export default function Home() {
     } else {
       setSortField(field)
       setSortOrder('desc')
+    }
+  }
+
+  // 在处理 OAuth 回调的地方
+  const handleOAuthCallback = (hash: string) => {
+    const params = new URLSearchParams(hash.substring(1))
+    const accessToken = params.get('access_token')
+    const expiresIn = parseInt(params.get('expires_in') || '3600')
+    
+    if (accessToken) {
+      googleDriveService.setToken(accessToken, expiresIn)
     }
   }
 
