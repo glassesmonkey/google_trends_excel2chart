@@ -197,7 +197,7 @@ export default function Home() {
                 sortField === 'freshness' ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'
               }`}
             >
-              按新鲜度{sortField === 'freshness' && (sortOrder === 'desc' ? '↓' : '↑')}
+              按热度{sortField === 'freshness' && (sortOrder === 'desc' ? '↓' : '↑')}
             </button>
             <button
               onClick={() => handleSortChange('lastWeekVolume')}

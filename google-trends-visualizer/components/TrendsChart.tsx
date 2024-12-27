@@ -85,7 +85,7 @@ export default function TrendsChart({ data }: TrendsChartProps) {
         {
           text: [
             `月均: ${formatNumber(averageMonthlyVolume)}`,
-            `新鲜度: ${freshnessScore}%`,
+            `热度: ${freshnessScore}%`,
             `近7日: ${formatNumber(data.lastWeekVolume || 0)}`
           ].join('  '),
           top: 20,
