@@ -1,6 +1,20 @@
-import { ComparisonPoint } from '../types'
+import { ComparisonPoint, TrendsData } from '../types'
 
-export const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
+export const calculateFreshnessScore = (comparisonData: ComparisonPoint[]): number => {
+  // 添加防护检查
+  if (!comparisonData || comparisonData.length === 0) {
+    console.warn('No comparison data available')
+    return 0
+  }
+
+  const data = comparisonData
+
+  // 添加详细的调试日志
+  console.log('calculateFreshnessScore received:', {
+    comparisonData,
+    dataLength: data.length
+  })
+
   const maxScore = 100
 
   // 按时间排序，找出数据集中的最新日期
@@ -36,7 +50,7 @@ export const calculateFreshnessScore = (data: ComparisonPoint[]): number => {
 
     // 检查当前时间段是否有流量
     const hasRecentTraffic = recentData.some(point => point.keyword > 0)
-    // 检查之前的时间段是否都没有流量
+    // 检查之前时间段是否都没有流量
     const hasOlderTraffic = olderData.some(point => point.keyword > 0)
 
     // 如果只在当前时间段有流量，之前都没有，就用这个分数

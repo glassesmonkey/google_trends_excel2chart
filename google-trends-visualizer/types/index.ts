@@ -5,6 +5,7 @@ export interface TrendsData {
   targetKeyword: string
   comparisonData: ComparisonPoint[]
   chartConfig?: ChartConfig
+  lastWeekVolume?: number
 }
 
 export interface ComparisonPoint {

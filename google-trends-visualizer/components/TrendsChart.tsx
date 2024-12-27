@@ -32,13 +32,26 @@ export default function TrendsChart({ data }: TrendsChartProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<echarts.ECharts | null>(null)
 
+  console.log('TrendsChart received data:', {
+    fullData: data,
+    targetKeyword: data?.targetKeyword,
+    comparisonDataLength: data?.comparisonData?.length,
+    firstComparisonPoint: data?.comparisonData?.[0],
+  })
+
   // 计算月平均搜索量
   const averageMonthlyVolume = Math.round(
     data.comparisonData.reduce((sum, point) => sum + point.monthlyVolume, 0) / 
     data.comparisonData.length
   )
 
-  // 使用新的计算函数
+  // 在调用 calculateFreshnessScore 之前添加调试日志
+  console.log('TrendsData being passed to calculateFreshnessScore:', {
+    fullData: data,
+    keyword: data?.targetKeyword,
+    hasData: Boolean(data?.comparisonData?.length)
+  })
+
   const freshnessScore = calculateFreshnessScore(data.comparisonData)
 
   useEffect(() => {
@@ -66,7 +79,8 @@ export default function TrendsChart({ data }: TrendsChartProps) {
         {
           text: [
             `月均搜索量: ${formatNumber(averageMonthlyVolume)}`,
-            `新鲜度: ${freshnessScore}%`
+            `新鲜度: ${freshnessScore}%`,
+            `近7天日均: ${formatNumber(data.lastWeekVolume || 0)}`
           ].join('    '),
           top: 30,
           left: 'center',

@@ -61,12 +61,20 @@ export default function FileUploader() {
         return null
       }
 
+      // 计算最后7天的平均搜索量
+      const lastWeekData = comparisonData.slice(-2)  // 获取最后两个数据点
+      const lastWeekVolume = Math.round(
+        lastWeekData.reduce((sum, point) => sum + point.dailyVolume, 0) / 
+        lastWeekData.length
+      )
+
       return {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
         fileName: file.name,
         targetKeyword,
         comparisonData,
+        lastWeekVolume,
         chartConfig: {
           title: `${targetKeyword} vs GPTs 趋势对比`,
           timeRange: `${comparisonData[0].date} - ${comparisonData[comparisonData.length-1].date}`,

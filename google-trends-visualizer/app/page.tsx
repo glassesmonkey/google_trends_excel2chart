@@ -11,7 +11,7 @@ import { calculateFreshnessScore } from '../utils/calculations'
 
 const ITEMS_PER_PAGE = 12
 
-type SortField = 'monthlyVolume' | 'freshness' | 'timestamp'
+type SortField = 'monthlyVolume' | 'freshness' | 'lastWeekVolume' | 'timestamp'
 type SortOrder = 'asc' | 'desc'
 
 export default function Home() {
@@ -36,7 +36,7 @@ export default function Home() {
   const filteredAndSortedData = useMemo(() => {
     let result = [...trendsData]
 
-    // 搜索过滤
+    // 索过滤
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(data => 
@@ -61,6 +61,10 @@ export default function Home() {
           compareValue = aFreshness - bFreshness
           break
         
+        case 'lastWeekVolume':
+          compareValue = (a.lastWeekVolume || 0) - (b.lastWeekVolume || 0)
+          break
+        
         default: // timestamp
           compareValue = a.timestamp - b.timestamp
       }
@@ -70,6 +74,14 @@ export default function Home() {
 
     return result
   }, [trendsData, searchTerm, sortField, sortOrder])
+
+  console.log('filteredAndSortedData sample:', 
+    filteredAndSortedData.slice(0, 1).map(d => ({
+      id: d.id,
+      keyword: d.targetKeyword,
+      hasComparisonData: Boolean(d.comparisonData?.length)
+    }))
+  )
 
   // 处理 Google Drive 认证
   useEffect(() => {
@@ -96,7 +108,7 @@ export default function Home() {
         }
       }
 
-      // 尝��恢复已保存的凭证
+      // 尝试恢复已保存的凭证
       console.log('Trying to restore token')
       if (googleDriveService.restoreToken()) {
         console.log('Token restored successfully')
@@ -198,6 +210,14 @@ export default function Home() {
               }`}
             >
               按新鲜度{sortField === 'freshness' && (sortOrder === 'desc' ? '↓' : '↑')}
+            </button>
+            <button
+              onClick={() => handleSortChange('lastWeekVolume')}
+              className={`px-4 py-2 rounded-lg border transition-colors ${
+                sortField === 'lastWeekVolume' ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'
+              }`}
+            >
+              按近7日均值{sortField === 'lastWeekVolume' && (sortOrder === 'desc' ? '↓' : '↑')}
             </button>
           </div>
         </div>
