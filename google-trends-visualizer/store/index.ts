@@ -12,6 +12,7 @@ interface Store {
   setAuthenticated: (state: boolean) => void
   syncWithDrive: () => Promise<void>
   loadFromDrive: () => Promise<void>
+  updateTrendsData: (ids: string[], updates: Partial<TrendsData>) => Promise<void>
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -61,6 +62,26 @@ export const useStore = create<Store>((set, get) => ({
       set({ trendsData: data })
     } catch (error) {
       console.error('从 Google Drive 加载失败:', error)
+    }
+  },
+
+  updateTrendsData: async (ids: string[], updates: Partial<TrendsData>) => {
+    const newData = get().trendsData.map(item => {
+      if (ids.includes(item.id)) {
+        return { ...item, ...updates }
+      }
+      return item
+    })
+    
+    set({ trendsData: newData })
+    
+    // 同步到 Google Drive
+    if (get().isAuthenticated) {
+      try {
+        await googleDriveService.saveData(newData)
+      } catch (error) {
+        console.error('同步到 Google Drive 失败:', error)
+      }
     }
   }
 })) 

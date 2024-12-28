@@ -18,13 +18,15 @@ export default function Home() {
     trendsData, 
     isAuthenticated, 
     setAuthenticated, 
-    loadFromDrive 
+    loadFromDrive,
+    updateTrendsData
   } = useStore()
   
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortField, setSortField] = useState<SortField>('timestamp')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   
   const { ref, inView } = useInView({
     threshold: 0,
@@ -116,7 +118,7 @@ export default function Home() {
           await loadFromDrive()
         } catch (error) {
           console.error('加载 Drive 数据失败:', error)
-          // 如果加载失���，可能是 token 失效
+          // 如果加载失败，可能是 token 失效
           setAuthenticated(false)
         }
       } else {
@@ -148,6 +150,32 @@ export default function Home() {
       setSortField(field)
       setSortOrder('desc')
     }
+  }
+
+  // 处理全选
+  const handleSelectAll = () => {
+    if (selectedIds.length === filteredAndSortedData.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredAndSortedData.map(d => d.id))
+    }
+  }
+  
+  // 处理单个选择
+  const handleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(i => i !== id)
+      }
+      return [...prev, id]
+    })
+  }
+  
+  // 标记为已研究
+  const handleMarkAsReviewed = async () => {
+    if (selectedIds.length === 0) return
+    await updateTrendsData(selectedIds, { reviewed: true })
+    setSelectedIds([])
   }
 
   return (
@@ -210,9 +238,49 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="flex gap-2 mb-6">
+          <div className="flex items-center gap-4 ml-auto">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={selectedIds.length === filteredAndSortedData.length}
+                onChange={handleSelectAll}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">全选</span>
+            </label>
+            
+            <button
+              onClick={handleMarkAsReviewed}
+              disabled={selectedIds.length === 0}
+              className={`px-4 py-2 rounded-lg border transition-colors
+                ${selectedIds.length > 0 
+                  ? 'bg-green-500 text-white hover:bg-green-600' 
+                  : 'bg-gray-100 text-gray-400'}`}
+            >
+              标记为已研究 ({selectedIds.length})
+            </button>
+          </div>
+        </div>
+
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAndSortedData.slice(0, displayCount).map((data) => (
-            <div key={data.id} className="bg-white rounded-lg shadow-sm p-4">
+            <div 
+              key={data.id} 
+              className={`relative rounded-lg shadow-sm p-4
+                ${data.reviewed 
+                  ? 'bg-emerald-50 border border-emerald-200' 
+                  : 'bg-white'}`}
+            >
+              <div className="absolute top-2 right-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(data.id)}
+                  onChange={() => handleSelect(data.id)}
+                  className="w-4 h-4"
+                />
+              </div>
+              
               <h2 className="text-sm font-medium mb-3 truncate">
                 {data.targetKeyword}
               </h2>

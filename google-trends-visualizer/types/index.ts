@@ -6,6 +6,7 @@ export interface TrendsData {
   comparisonData: ComparisonPoint[]
   chartConfig?: ChartConfig
   lastWeekVolume?: number
+  reviewed?: boolean
 }
 
 export interface ComparisonPoint {

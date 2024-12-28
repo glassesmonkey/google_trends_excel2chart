@@ -150,14 +150,20 @@ class GoogleDriveService {
     console.log('准备保存数据:', {
       originalDataCount: data.length,
       filteredDataCount: filteredData.length,
-      filteredDataIds: filteredData.map(d => d.id)
+      filteredDataIds: filteredData.map(d => ({
+        id: d.id,
+        reviewed: d.reviewed
+      }))
     })
 
     // 先获取现有数据
     const existingData = await this.loadData()
     console.log('获取到现有数据:', {
       existingDataCount: existingData.length,
-      existingDataIds: existingData.map(d => d.id)
+      existingDataIds: existingData.map(d => ({
+        id: d.id,
+        reviewed: d.reviewed
+      }))
     })
     
     // 合并数据时也要过滤现有数据
@@ -174,22 +180,28 @@ class GoogleDriveService {
     const mergedData = [...filteredExistingData, ...filteredData].reduce((acc: TrendsData[], current) => {
       const exists = acc.find(item => item.id === current.id)
       if (!exists) {
-        console.log(`添加新数据: ${current.id} (${current.targetKeyword})`)
-        acc.push(current)
+        console.log(`添加新数据: ${current.id} (${current.targetKeyword}), reviewed: ${current.reviewed}`)
+        acc.push({
+          ...current,
+          reviewed: Boolean(current.reviewed)
+        })
       } else {
-        // 如果数据已存在，使用较新的数据
+        // 如果数据已存在，保留最新的 reviewed 状态
         const index = acc.findIndex(item => item.id === current.id)
-        if (current.timestamp > exists.timestamp) {
-          console.log(`更新现有数据: ${current.id} (${current.targetKeyword})`, {
-            oldTimestamp: exists.timestamp,
-            newTimestamp: current.timestamp
-          })
-          acc[index] = current
-        } else {
-          console.log(`保留现有数据: ${exists.id} (${exists.targetKeyword})`, {
-            existingTimestamp: exists.timestamp,
-            newDataTimestamp: current.timestamp
-          })
+        const newerData = current.timestamp > exists.timestamp ? current : exists
+        const reviewedStatus = current.reviewed || exists.reviewed // 保留任一为 true 的状态
+
+        console.log(`更新现有数据: ${current.id} (${current.targetKeyword})`, {
+          oldTimestamp: exists.timestamp,
+          newTimestamp: current.timestamp,
+          oldReviewed: exists.reviewed,
+          newReviewed: reviewedStatus,
+          finalReviewed: reviewedStatus
+        })
+        
+        acc[index] = {
+          ...newerData,
+          reviewed: reviewedStatus
         }
       }
       return acc
@@ -197,12 +209,14 @@ class GoogleDriveService {
 
     console.log('合并后的数据:', {
       mergedDataCount: mergedData.length,
-      mergedDataIds: mergedData.map(d => d.id)
+      mergedDataIds: mergedData.map(d => ({
+        id: d.id,
+        reviewed: d.reviewed
+      }))
     })
 
     const fileName = 'trends_data.json'
-
-    const fileContent = JSON.stringify(mergedData)
+    const fileContent = JSON.stringify(mergedData, null, 2)
 
     // 查找现有文件
     const searchResponse = await fetch(
@@ -309,76 +323,68 @@ class GoogleDriveService {
             }
           }
         )
-        const data = await response.json()
-        console.log(`文件 ${file.id} 内容:`, {
-          dataCount: Array.isArray(data) ? data.length : 'not an array',
-          dataIds: Array.isArray(data) ? data.map(d => d.id) : 'N/A'
-        })
-        return data
+        
+        try {
+          const data = await response.json()
+          // 添加调试日志
+          console.log('从 Drive 加载的数据示例:', {
+            dataCount: Array.isArray(data) ? data.length : 'not an array',
+            firstItem: Array.isArray(data) && data.length > 0 ? {
+              id: data[0].id,
+              keyword: data[0].targetKeyword,
+              reviewed: data[0].reviewed
+            } : 'no data'
+          })
+          return data
+        } catch (error) {
+          console.error('解析文件内容失败:', error)
+          return []
+        }
       })
     )
 
     // 合并所有数据并去重
     console.log('开始合并数据')
     const mergedData = allData.flat().reduce((acc: TrendsData[], current) => {
+      if (!current) return acc
+      
       const exists = acc.find(item => item.id === current.id)
       if (!exists) {
-        console.log(`添加新数据: ${current.id} (${current.targetKeyword})`)
-        acc.push(current)
+        // 确保 reviewed 字段被保留
+        console.log(`添加新数据: ${current.id} (${current.targetKeyword}), reviewed: ${current.reviewed}`)
+        acc.push({
+          ...current,
+          reviewed: Boolean(current.reviewed) // 确保 reviewed 是布尔值
+        })
       } else {
-        // 如果数据已存在，使用较新的数据
+        // 如果数据已存在，使用较新的数据，同时保留 reviewed 状态
         const index = acc.findIndex(item => item.id === current.id)
-        if (current.timestamp > exists.timestamp) {
-          console.log(`更新现有数据: ${current.id} (${current.targetKeyword})`, {
-            oldTimestamp: exists.timestamp,
-            newTimestamp: current.timestamp
-          })
-          acc[index] = current
-        } else {
-          console.log(`保留现有数据: ${exists.id} (${exists.targetKeyword})`, {
-            existingTimestamp: exists.timestamp,
-            newDataTimestamp: current.timestamp
-          })
+        const reviewedStatus = current.reviewed || exists.reviewed // 保留任一为 true 的状态
+
+        console.log(`更新现有数据: ${current.id} (${current.targetKeyword})`, {
+          oldTimestamp: exists.timestamp,
+          newTimestamp: current.timestamp,
+          oldReviewed: exists.reviewed,
+          newReviewed: current.reviewed,
+          finalReviewed: reviewedStatus
+        })
+
+        acc[index] = {
+          ...(current.timestamp > exists.timestamp ? current : exists),
+          reviewed: reviewedStatus // 使用合并后的 reviewed 状态
         }
       }
       return acc
-    }, []).filter(item => {
-      const averageMonthlyVolume = item.comparisonData.reduce(
-        (sum, point) => sum + point.monthlyVolume, 
-        0
-      ) / item.comparisonData.length
+    }, [])
 
-      return averageMonthlyVolume > 0
+    console.log('数据合并完成:', {
+      totalItems: mergedData.length,
+      reviewedItems: mergedData.filter(item => item.reviewed).length,
+      reviewedItemIds: mergedData.filter(item => item.reviewed).map(item => ({
+        id: item.id,
+        keyword: item.targetKeyword
+      }))
     })
-
-    console.log('数据合并完成 (已过滤月均搜索量为0的数据):', {
-      totalFiles: searchResult.files.length,
-      mergedDataCount: mergedData.length,
-      mergedDataIds: mergedData.map(d => d.id)
-    })
-
-    // 如果有多个文件，删除旧文件并保存合并后的数据
-    if (searchResult.files.length > 1) {
-      console.log('检测到多个文件，开始清理')
-      // 删除所有旧文件
-      await Promise.all(
-        searchResult.files.map(async (file: { id: string }) => {
-          console.log(`删除文件: ${file.id}`)
-          await fetch(
-            `https://www.googleapis.com/drive/v3/files/${file.id}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${this.token}`
-              }
-            }
-          )
-        })
-      )
-
-      console.log('保存合并后的数据到新文件')
-      await this.saveData(mergedData)
-    }
 
     return mergedData
   }
