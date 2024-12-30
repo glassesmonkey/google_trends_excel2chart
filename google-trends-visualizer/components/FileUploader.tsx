@@ -17,56 +17,142 @@ export default function FileUploader() {
       const text = await file.text()
       const lines = text.split('\n')
       
-      const headers = lines[2].split(',')
-      const targetKeywordCell = headers[2]?.trim() || ''
-      const targetKeyword = targetKeywordCell.split(': ')[0]
+      console.log('CSV 文件内容:', {
+        fileName: file.name,
+        totalLines: lines.length,
+        firstFewLines: lines.slice(0, 5)
+      })
+      
+      // 直接使用第3行（索引2）作为表头行
+      const headerIndex = 2
+      let targetKeyword = ''
+      
+      const parseCsvLine = (line: string) => {
+        const result = []
+        let cell = ''
+        let inQuotes = false
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          if (char === '"') {
+            inQuotes = !inQuotes
+          } else if (char === ',' && !inQuotes) {
+            result.push(cell)
+            cell = ''
+          } else {
+            cell += char
+          }
+        }
+        result.push(cell)
+        return result.map(cell => cell.replace(/^"|"$/g, '').trim())
+      }
+      
+      // 解析表头行
+      const headerLine = lines[headerIndex]?.trim()
+      if (!headerLine) {
+        throw new Error(`文件 ${file.name} 格式不正确：找不到表头行`)
+      }
+      
+      const headerCells = parseCsvLine(headerLine)
+      console.log('表头行:', {
+        line: headerLine,
+        cells: headerCells
+      })
+      
+      if (headerCells.length < 3) {
+        throw new Error(`文件 ${file.name} 格式不正确：表头列数不足`)
+      }
+      
+      // 使用第三列（索引2）作为目标关键词
+      targetKeyword = headerCells[2]
+        .replace(/: \((全球|Worldwide|[^)]+)\)/, '')  // 移除任何括号中的地区标识
+        .trim()
+      
+      console.log('提取到关键词:', targetKeyword)
+      
+      if (!targetKeyword) {
+        throw new Error(`文件 ${file.name} 格式不正确：无法获取关键词`)
+      }
 
-      const comparisonData: ComparisonPoint[] = lines.slice(3)
-        .map(line => {
-          const cells = line.split(',')
-          if (cells.length < 3) return null
+      // 从表头的下一行开始处理数据
+      const dataStartIndex = headerIndex + 1
 
-          const date = cells[0]?.trim()
-          const gptsValue = parseFloat(cells[1]?.trim() || '0')
-          const targetValue = parseFloat(cells[2]?.trim() || '0')
+      console.log('开始处理数据行:', {
+        dataStartIndex,
+        targetKeyword,
+        remainingLines: lines.slice(dataStartIndex, dataStartIndex + 3)
+      })
+
+      const comparisonData: ComparisonPoint[] = lines.slice(dataStartIndex)
+        .map((line, index) => {
+          if (!line.trim()) return null
           
-          if (!date || isNaN(gptsValue) || isNaN(targetValue)) return null
+          const cells = parseCsvLine(line)
+          if (cells.length < 3) {
+            console.log(`跳过无效行 ${index + dataStartIndex + 1}:`, {
+              line,
+              cellCount: cells.length
+            })
+            return null
+          }
+
+          const date = cells[0]
+          const gptsValue = parseFloat(cells[1] || '0')
+          // 处理特殊值 "<1"
+          const rawTargetValue = cells[2]
+          const targetValue = rawTargetValue === '<1' ? 0.5 : parseFloat(rawTargetValue || '0')
+          
+          if (!date || isNaN(gptsValue) || isNaN(targetValue)) {
+            console.log(`跳过数据无效的行 ${index + dataStartIndex + 1}:`, {
+              date,
+              gptsValue,
+              targetValue,
+              rawCells: cells
+            })
+            return null
+          }
+
+          // 将日期格式标准化（支持两种格式）
+          const standardDate = date.includes('-') ? date : 
+            date.replace(/(\d{4})\/(\d{1,2})\/(\d{1,2})/, 
+              (_, year, month, day) => {
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+              }
+            )
 
           const targetDailyVolume = (targetValue / gptsValue) * GPTS_DAILY_VOLUME
           const targetMonthlyVolume = targetDailyVolume * 30
 
-          return {
-            date,
+          const point = {
+            date: standardDate,
             gpts: gptsValue,
             keyword: targetValue,
             dailyVolume: Math.round(targetDailyVolume),
             monthlyVolume: Math.round(targetMonthlyVolume)
           }
+
+          console.log(`处理数据行 ${index + dataStartIndex + 1}:`, point)
+          return point
         })
         .filter(Boolean) as ComparisonPoint[]
+
+      console.log('数据处理完成:', {
+        fileName: file.name,
+        totalPoints: comparisonData.length,
+        firstPoint: comparisonData[0],
+        lastPoint: comparisonData[comparisonData.length - 1]
+      })
 
       if (comparisonData.length === 0) {
         throw new Error(`文件 ${file.name} 没有有效的数据行`)
       }
 
-      // 计算平均月搜索量
-      const averageMonthlyVolume = comparisonData.reduce(
-        (sum, point) => sum + point.monthlyVolume, 
-        0
-      ) / comparisonData.length
-
       // 计算最后7天的平均搜索量
-      const lastWeekData = comparisonData.slice(-2)  // 获取最后两个数据点
+      const lastWeekData = comparisonData.slice(-7)
       const lastWeekVolume = Math.round(
         lastWeekData.reduce((sum, point) => sum + point.dailyVolume, 0) / 
         lastWeekData.length
       )
-
-      // 修改过滤条件：只有当月均和近7日均值都为0时才跳过
-      if (averageMonthlyVolume === 0 && lastWeekVolume === 0) {
-        console.log(`跳过文件 ${file.name}: 月均搜索量和近7日均值都为0`)
-        return null
-      }
 
       return {
         id: crypto.randomUUID(),
