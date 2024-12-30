@@ -6,6 +6,9 @@ class GoogleDriveService {
   private token: string | null = null
   private folderId: string | null = null
   private tokenExpiry: number | null = null
+  
+  private UNREVIEWED_FILE_NAME = 'trends_data.json'
+  private REVIEWED_FILE_NAME = 'reviewed_trends_data.json'
 
   // 获取授权URL
   getAuthUrl() {
@@ -388,6 +391,139 @@ class GoogleDriveService {
     })
 
     return mergedData
+  }
+
+  async saveDataWithReviewedStatus(data: TrendsData[]) {
+    const reviewedData = data.filter(item => item.reviewed)
+    const unreviewedData = data.filter(item => !item.reviewed)
+
+    console.log('准备分离数据:', {
+      totalCount: data.length,
+      reviewedCount: reviewedData.length,
+      unreviewedCount: unreviewedData.length
+    })
+
+    // 保存未研究数据
+    await this.saveToFile(unreviewedData, this.UNREVIEWED_FILE_NAME)
+    // 保存已研究数据
+    await this.saveToFile(reviewedData, this.REVIEWED_FILE_NAME)
+  }
+
+  private async saveToFile(data: TrendsData[], fileName: string) {
+    await this.checkAndRefreshToken()
+    
+    if (!this.folderId) {
+      this.folderId = await this.getOrCreateFolder()
+    }
+
+    const fileContent = JSON.stringify(data, null, 2)
+
+    // 查找现有文件
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${this.folderId}' in parents`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      }
+    )
+
+    const searchResult = await searchResponse.json()
+    
+    if (searchResult.files?.length) {
+      // 更新现有文件
+      await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${searchResult.files[0].id}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: fileContent
+        }
+      )
+    } else {
+      // 创建新文件
+      const metadata = {
+        name: fileName,
+        parents: [this.folderId]
+      }
+
+      const form = new FormData()
+      form.append(
+        'metadata',
+        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+      )
+      form.append(
+        'file',
+        new Blob([fileContent], { type: 'application/json' })
+      )
+
+      await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.token}`
+          },
+          body: form
+        }
+      )
+    }
+  }
+
+  async loadAllData(includeReviewed: boolean = false) {
+    const unreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+    
+    if (!includeReviewed) {
+      return unreviewedData
+    }
+
+    const reviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
+    return [...unreviewedData, ...reviewedData]
+  }
+
+  private async loadFromFile(fileName: string): Promise<TrendsData[]> {
+    await this.checkAndRefreshToken()
+    
+    if (!this.folderId) {
+      this.folderId = await this.getOrCreateFolder()
+    }
+
+    // 查找文件
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${this.folderId}' in parents`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      }
+    )
+
+    const searchResult = await searchResponse.json()
+    
+    if (!searchResult.files?.length) {
+      return []
+    }
+
+    // 获取文件内容
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${searchResult.files[0].id}?alt=media`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      }
+    )
+
+    try {
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      console.error('解析文件内容失败:', error)
+      return []
+    }
   }
 }
 

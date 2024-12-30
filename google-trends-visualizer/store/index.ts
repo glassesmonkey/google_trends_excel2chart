@@ -6,6 +6,7 @@ interface Store {
   trendsData: TrendsData[]
   uploadState: UploadState
   isAuthenticated: boolean
+  showReviewed: boolean
   setTrendsData: (data: TrendsData[]) => void
   addTrendsData: (data: TrendsData) => Promise<void>
   setUploadState: (state: Partial<UploadState>) => void
@@ -13,6 +14,7 @@ interface Store {
   syncWithDrive: () => Promise<void>
   loadFromDrive: () => Promise<void>
   updateTrendsData: (ids: string[], updates: Partial<TrendsData>) => Promise<void>
+  setShowReviewed: (show: boolean) => Promise<void>
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -22,6 +24,15 @@ export const useStore = create<Store>((set, get) => ({
     progress: 0,
   },
   isAuthenticated: false,
+  showReviewed: false,
+
+  setShowReviewed: async (show) => {
+    set({ showReviewed: show })
+    if (get().isAuthenticated) {
+      const data = await googleDriveService.loadAllData(show)
+      set({ trendsData: data })
+    }
+  },
 
   setTrendsData: (data) => set({ trendsData: data }),
   
@@ -58,7 +69,7 @@ export const useStore = create<Store>((set, get) => ({
   loadFromDrive: async () => {
     if (!get().isAuthenticated) return
     try {
-      const data = await googleDriveService.loadData()
+      const data = await googleDriveService.loadAllData(get().showReviewed)
       set({ trendsData: data })
     } catch (error) {
       console.error('从 Google Drive 加载失败:', error)
@@ -75,10 +86,9 @@ export const useStore = create<Store>((set, get) => ({
     
     set({ trendsData: newData })
     
-    // 同步到 Google Drive
     if (get().isAuthenticated) {
       try {
-        await googleDriveService.saveData(newData)
+        await googleDriveService.saveDataWithReviewedStatus(newData)
       } catch (error) {
         console.error('同步到 Google Drive 失败:', error)
       }

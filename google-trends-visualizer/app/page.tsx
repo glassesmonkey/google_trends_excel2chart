@@ -19,7 +19,9 @@ export default function Home() {
     isAuthenticated, 
     setAuthenticated, 
     loadFromDrive,
-    updateTrendsData
+    updateTrendsData,
+    showReviewed,
+    setShowReviewed
   } = useStore()
   
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
@@ -239,6 +241,23 @@ export default function Home() {
         </div>
 
         <div className="flex gap-2 mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowReviewed(false)}
+              className={`px-4 py-2 rounded-lg border transition-colors
+                ${!showReviewed ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`}
+            >
+              未研究数据
+            </button>
+            <button
+              onClick={() => setShowReviewed(true)}
+              className={`px-4 py-2 rounded-lg border transition-colors
+                ${showReviewed ? 'bg-blue-500 text-white' : 'hover:bg-gray-50'}`}
+            >
+              所有数据
+            </button>
+          </div>
+
           <div className="flex items-center gap-4 ml-auto">
             <label className="flex items-center gap-2">
               <input
