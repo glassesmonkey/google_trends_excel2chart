@@ -409,14 +409,32 @@ class GoogleDriveService {
     await this.saveToFile(reviewedData, this.REVIEWED_FILE_NAME)
   }
 
-  private async saveToFile(data: TrendsData[], fileName: string) {
+  private async saveToFile(newData: TrendsData[], fileName: string) {
     await this.checkAndRefreshToken()
     
     if (!this.folderId) {
       this.folderId = await this.getOrCreateFolder()
     }
 
-    const fileContent = JSON.stringify(data, null, 2)
+    // 先读取现有文件内容
+    const existingData = await this.loadFromFile(fileName)
+    
+    // 合并数据，使用 targetKeyword 作为唯一标识符
+    const mergedData = [...existingData, ...newData].reduce((acc: TrendsData[], current) => {
+      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
+      if (!exists) {
+        acc.push(current)
+      } else {
+        // 如果数据已存在，使用较新的数据
+        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
+        if (current.timestamp > exists.timestamp) {
+          acc[index] = current
+        }
+      }
+      return acc
+    }, [])
+
+    const fileContent = JSON.stringify(mergedData, null, 2)
 
     // 查找现有文件
     const searchResponse = await fetch(
@@ -471,6 +489,8 @@ class GoogleDriveService {
         }
       )
     }
+
+    return mergedData
   }
 
   async loadAllData(includeReviewed: boolean = false) {
