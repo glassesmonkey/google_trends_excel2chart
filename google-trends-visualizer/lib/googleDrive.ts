@@ -176,22 +176,22 @@ class GoogleDriveService {
       return averageMonthlyVolume > 0
     })
 
-    // 合并数据，使用 id 作为唯一标识符去重
+    // 合并数据，使用 targetKeyword 作为唯一标识符去重
     const mergedData = [...filteredExistingData, ...filteredData].reduce((acc: TrendsData[], current) => {
-      const exists = acc.find(item => item.id === current.id)
+      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
       if (!exists) {
-        console.log(`添加新数据: ${current.id} (${current.targetKeyword}), reviewed: ${current.reviewed}`)
+        console.log(`添加新数据: ${current.targetKeyword}, reviewed: ${current.reviewed}`)
         acc.push({
           ...current,
           reviewed: Boolean(current.reviewed)
         })
       } else {
-        // 如果数据已存在，保留最新的 reviewed 状态
-        const index = acc.findIndex(item => item.id === current.id)
+        // 如果数据已存在，使用较新的数据
+        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
         const newerData = current.timestamp > exists.timestamp ? current : exists
         const reviewedStatus = current.reviewed || exists.reviewed // 保留任一为 true 的状态
 
-        console.log(`更新现有数据: ${current.id} (${current.targetKeyword})`, {
+        console.log(`更新现有数据: ${current.targetKeyword}`, {
           oldTimestamp: exists.timestamp,
           newTimestamp: current.timestamp,
           oldReviewed: exists.reviewed,
@@ -201,6 +201,7 @@ class GoogleDriveService {
         
         acc[index] = {
           ...newerData,
+          id: newerData.id, // 保留较新数据的 id
           reviewed: reviewedStatus
         }
       }
