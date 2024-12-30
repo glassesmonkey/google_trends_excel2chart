@@ -300,9 +300,33 @@ export default function Home() {
                 />
               </div>
               
-              <h2 className="text-sm font-medium mb-3 truncate">
-                {data.targetKeyword}
-              </h2>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  <h2 className="text-sm font-medium truncate">
+                    {data.targetKeyword}
+                  </h2>
+                  <button
+                    onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(data.targetKeyword)}`, '_blank')}
+                    className="p-1 text-gray-500 hover:text-blue-500 transition-colors flex-shrink-0"
+                    title="在 Google 中搜索"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      className="w-4 h-4"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <TrendsChart data={data} />
             </div>
           ))}
