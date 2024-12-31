@@ -547,14 +547,47 @@ class GoogleDriveService {
   }
 
   async loadAllData(includeReviewed: boolean = false) {
+    // 获取所有数据
     const unreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+    const reviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
     
+    console.log('loadAllData 原始数据:', {
+      未研究数据: unreviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      })),
+      已研究数据: reviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      }))
+    })
+    
+    // 创建已研究关键词的集合
+    const reviewedKeywords = new Set(reviewedData.map(item => item.targetKeyword))
+    
+    // 过滤未研究数据，确保不包含已研究的关键词
+    const filteredUnreviewedData = unreviewedData.filter(item => 
+      !reviewedKeywords.has(item.targetKeyword)
+    ).map(item => ({
+      ...item,
+      reviewed: false  // 确保未研究数据的 reviewed 字段为 false
+    }))
+
+    console.log('loadAllData 处理后数据:', {
+      过滤后未研究数据: filteredUnreviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      })),
+      是否包含已研究: includeReviewed
+    })
+
     if (!includeReviewed) {
-      return unreviewedData
+      // 只返回未研究的数据（已确保不包含已研究的关键词）
+      return filteredUnreviewedData
     }
 
-    const reviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
-    return [...unreviewedData, ...reviewedData]
+    // 返回所有数据
+    return [...filteredUnreviewedData, ...reviewedData]
   }
 
   private async loadFromFile(fileName: string): Promise<TrendsData[]> {
@@ -606,7 +639,33 @@ class GoogleDriveService {
       this.folderId = await this.getOrCreateFolder()
     }
 
-    // 查找已研究数据文件
+    // 1. 先加载所有数据
+    const unreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+    const reviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
+
+    console.log('删除前数据状态:', {
+      未研究数据: unreviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      })),
+      已研究数据: reviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      }))
+    })
+
+    // 2. 获取已研究的关键词集合
+    const reviewedKeywords = new Set(reviewedData.map(item => item.targetKeyword))
+
+    // 3. 从未研究数据中过滤掉已研究的数据
+    const cleanedUnreviewedData = unreviewedData.filter(item => 
+      !reviewedKeywords.has(item.targetKeyword)
+    )
+
+    // 4. 保存清理后的未研究数据
+    await this.saveToFile(cleanedUnreviewedData, this.UNREVIEWED_FILE_NAME)
+
+    // 5. 删除已研究数据文件
     const searchResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=name='${this.REVIEWED_FILE_NAME}' and '${this.folderId}' in parents`,
       {
@@ -619,7 +678,6 @@ class GoogleDriveService {
     const searchResult = await searchResponse.json()
     
     if (searchResult.files?.length) {
-      // 删除文件
       await fetch(
         `https://www.googleapis.com/drive/v3/files/${searchResult.files[0].id}`,
         {
@@ -629,11 +687,18 @@ class GoogleDriveService {
           }
         }
       )
-      console.log('已删除已研究数据文件')
-      return true
     }
-    
-    return false
+
+    // 6. 验证清理结果
+    const finalUnreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+    console.log('删除后数据状态:', {
+      清理后的未研究数据: finalUnreviewedData.map(d => ({
+        keyword: d.targetKeyword,
+        reviewed: d.reviewed
+      }))
+    })
+
+    return true
   }
 }
 

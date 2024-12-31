@@ -7,6 +7,8 @@ interface Store {
   uploadState: UploadState
   isAuthenticated: boolean
   showReviewed: boolean
+  isLoading: boolean
+  loadingText: string
   setTrendsData: (data: TrendsData[]) => void
   addTrendsData: (data: TrendsData) => Promise<void>
   setUploadState: (state: Partial<UploadState>) => void
@@ -16,6 +18,8 @@ interface Store {
   updateTrendsData: (ids: string[], updates: Partial<TrendsData>) => Promise<void>
   setShowReviewed: (show: boolean) => Promise<void>
   clearReviewedData: () => Promise<void>
+  setLoading: (isLoading: boolean, text?: string) => void
+  logout: () => void
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -26,12 +30,22 @@ export const useStore = create<Store>((set, get) => ({
   },
   isAuthenticated: false,
   showReviewed: false,
+  isLoading: false,
+  loadingText: '',
+
+  setLoading: (isLoading: boolean, text: string = '') => 
+    set({ isLoading, loadingText: text }),
 
   setShowReviewed: async (show) => {
     set({ showReviewed: show })
     if (get().isAuthenticated) {
-      const data = await googleDriveService.loadAllData(show)
-      set({ trendsData: data })
+      try {
+        set({ isLoading: true, loadingText: '正在加载数据...' })
+        const data = await googleDriveService.loadAllData(show)
+        set({ trendsData: data })
+      } finally {
+        set({ isLoading: false, loadingText: '' })
+      }
     }
   },
 
@@ -44,9 +58,10 @@ export const useStore = create<Store>((set, get) => ({
     // 同步到 Google Drive
     if (get().isAuthenticated) {
       try {
+        set({ isLoading: true, loadingText: '正在保存数据...' })
         await googleDriveService.saveData(newData)
-      } catch (error) {
-        console.error('同步到 Google Drive 失败:', error)
+      } finally {
+        set({ isLoading: false, loadingText: '' })
       }
     }
   },
@@ -61,19 +76,21 @@ export const useStore = create<Store>((set, get) => ({
   syncWithDrive: async () => {
     if (!get().isAuthenticated) return
     try {
+      set({ isLoading: true, loadingText: '正在同步数据...' })
       await googleDriveService.saveData(get().trendsData)
-    } catch (error) {
-      console.error('同步到 Google Drive 失败:', error)
+    } finally {
+      set({ isLoading: false, loadingText: '' })
     }
   },
 
   loadFromDrive: async () => {
     if (!get().isAuthenticated) return
     try {
+      set({ isLoading: true, loadingText: '正在从云端加载数据...' })
       const data = await googleDriveService.loadAllData(get().showReviewed)
       set({ trendsData: data })
-    } catch (error) {
-      console.error('从 Google Drive 加载失败:', error)
+    } finally {
+      set({ isLoading: false, loadingText: '' })
     }
   },
 
@@ -89,9 +106,10 @@ export const useStore = create<Store>((set, get) => ({
     
     if (get().isAuthenticated) {
       try {
+        set({ isLoading: true, loadingText: '正在更新数据状态...' })
         await googleDriveService.saveDataWithReviewedStatus(newData)
-      } catch (error) {
-        console.error('同步到 Google Drive 失败:', error)
+      } finally {
+        set({ isLoading: false, loadingText: '' })
       }
     }
   },
@@ -100,14 +118,24 @@ export const useStore = create<Store>((set, get) => ({
     if (!get().isAuthenticated) return
     
     try {
+      set({ isLoading: true, loadingText: '正在清除已研究数据...' })
       const success = await googleDriveService.deleteReviewedData()
       if (success) {
         // 重新加载数据
         const data = await googleDriveService.loadAllData(get().showReviewed)
         set({ trendsData: data })
       }
-    } catch (error) {
-      console.error('清除已研究数据失败:', error)
+    } finally {
+      set({ isLoading: false, loadingText: '' })
     }
+  },
+
+  logout: () => {
+    googleDriveService.clearToken()
+    set({ 
+      isAuthenticated: false,
+      trendsData: [],
+      showReviewed: false
+    })
   }
 })) 

@@ -22,7 +22,10 @@ export default function Home() {
     updateTrendsData,
     showReviewed,
     setShowReviewed,
-    clearReviewedData
+    clearReviewedData,
+    isLoading,
+    loadingText,
+    logout
   } = useStore()
   
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
@@ -191,19 +194,38 @@ export default function Home() {
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8 font-[family-name:var(--font-geist-sans)]">
       <main className="max-w-[1920px] mx-auto">
+        {isLoading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+              <div className="text-lg font-medium">{loadingText}</div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">
             Google Trends Visualizer
           </h1>
-          {!isAuthenticated && (
-            <button
-              onClick={handleLogin}
-              className="px-4 py-2 bg-blue-500 text-white rounded-full
-                      hover:bg-blue-600 transition-colors"
-            >
-              连接 Google Drive
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {!isAuthenticated ? (
+              <button
+                onClick={handleLogin}
+                className="px-4 py-2 bg-blue-500 text-white rounded-full
+                        hover:bg-blue-600 transition-colors"
+              >
+                连接 Google Drive
+              </button>
+            ) : (
+              <button
+                onClick={logout}
+                className="px-4 py-2 bg-gray-500 text-white rounded-full
+                        hover:bg-gray-600 transition-colors"
+              >
+                退出登录
+              </button>
+            )}
+          </div>
         </div>
 
         <section className="mb-6">
