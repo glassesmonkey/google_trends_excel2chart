@@ -143,8 +143,8 @@ class GoogleDriveService {
         0
       ) / item.comparisonData.length
 
-      if (averageMonthlyVolume === 0) {
-        console.log(`过滤掉月均搜索量为0的数据: ${item.targetKeyword}`)
+      if (averageMonthlyVolume < 1000) {
+        console.log(`过滤掉月均搜索量低于1000的数据: ${item.targetKeyword} (${averageMonthlyVolume})`)
         return false
       }
       return true
