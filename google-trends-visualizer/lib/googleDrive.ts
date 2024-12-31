@@ -403,10 +403,63 @@ class GoogleDriveService {
       unreviewedCount: unreviewedData.length
     })
 
-    // 保存未研究数据
-    await this.saveToFile(unreviewedData, this.UNREVIEWED_FILE_NAME)
+    // 获取现有的已研究数据
+    const existingReviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
+    // 获取现有的未研究数据
+    const existingUnreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+
+    // 合并已研究数据
+    const mergedReviewedData = [...existingReviewedData, ...reviewedData].reduce((acc: TrendsData[], current) => {
+      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
+      if (!exists) {
+        acc.push(current)
+      } else {
+        // 如果数据已存在，使用较新的数据
+        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
+        if (current.timestamp > exists.timestamp) {
+          acc[index] = current
+        }
+      }
+      return acc
+    }, [])
+
+    // 处理未研究数据：移除已被标记为已研究的数据
+    const reviewedKeywords = new Set(mergedReviewedData.map(item => item.targetKeyword))
+    const filteredUnreviewedData = existingUnreviewedData.filter(item => 
+      !reviewedKeywords.has(item.targetKeyword)
+    )
+
+    // 合并未研究数据（排除已研究的）
+    const mergedUnreviewedData = [...filteredUnreviewedData, ...unreviewedData].reduce((acc: TrendsData[], current) => {
+      // 如果关键词已经在已研究数据中，跳过
+      if (reviewedKeywords.has(current.targetKeyword)) {
+        return acc
+      }
+      
+      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
+      if (!exists) {
+        acc.push(current)
+      } else {
+        // 如果数据已存在，使用较新的数据
+        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
+        if (current.timestamp > exists.timestamp) {
+          acc[index] = current
+        }
+      }
+      return acc
+    }, [])
+
+    console.log('数据处理结果:', {
+      reviewedCount: mergedReviewedData.length,
+      unreviewedCount: mergedUnreviewedData.length,
+      reviewedKeywords: mergedReviewedData.map(d => d.targetKeyword),
+      unreviewedKeywords: mergedUnreviewedData.map(d => d.targetKeyword)
+    })
+
     // 保存已研究数据
-    await this.saveToFile(reviewedData, this.REVIEWED_FILE_NAME)
+    await this.saveToFile(mergedReviewedData, this.REVIEWED_FILE_NAME)
+    // 保存未研究数据
+    await this.saveToFile(mergedUnreviewedData, this.UNREVIEWED_FILE_NAME)
   }
 
   private async saveToFile(newData: TrendsData[], fileName: string) {
