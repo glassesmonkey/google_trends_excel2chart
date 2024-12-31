@@ -15,6 +15,7 @@ interface Store {
   loadFromDrive: () => Promise<void>
   updateTrendsData: (ids: string[], updates: Partial<TrendsData>) => Promise<void>
   setShowReviewed: (show: boolean) => Promise<void>
+  clearReviewedData: () => Promise<void>
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -92,6 +93,21 @@ export const useStore = create<Store>((set, get) => ({
       } catch (error) {
         console.error('同步到 Google Drive 失败:', error)
       }
+    }
+  },
+
+  clearReviewedData: async () => {
+    if (!get().isAuthenticated) return
+    
+    try {
+      const success = await googleDriveService.deleteReviewedData()
+      if (success) {
+        // 重新加载数据
+        const data = await googleDriveService.loadAllData(get().showReviewed)
+        set({ trendsData: data })
+      }
+    } catch (error) {
+      console.error('清除已研究数据失败:', error)
     }
   }
 })) 

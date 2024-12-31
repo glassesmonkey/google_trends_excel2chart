@@ -21,7 +21,8 @@ export default function Home() {
     loadFromDrive,
     updateTrendsData,
     showReviewed,
-    setShowReviewed
+    setShowReviewed,
+    clearReviewedData
   } = useStore()
   
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
@@ -180,6 +181,13 @@ export default function Home() {
     setSelectedIds([])
   }
 
+  // 添加清除处理函数
+  const handleClearReviewed = async () => {
+    if (confirm('确定要删除所有已研究的数据吗？此操作不可恢复。')) {
+      await clearReviewedData()
+    }
+  }
+
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8 font-[family-name:var(--font-geist-sans)]">
       <main className="max-w-[1920px] mx-auto">
@@ -256,6 +264,16 @@ export default function Home() {
             >
               所有数据
             </button>
+            
+            {isAuthenticated && (
+              <button
+                onClick={handleClearReviewed}
+                className="px-4 py-2 rounded-lg border bg-red-500 text-white 
+                         hover:bg-red-600 transition-colors"
+              >
+                清除已研究数据
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4 ml-auto">

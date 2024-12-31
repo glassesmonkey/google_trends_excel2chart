@@ -545,6 +545,43 @@ class GoogleDriveService {
       return []
     }
   }
+
+  async deleteReviewedData() {
+    await this.checkAndRefreshToken()
+    
+    if (!this.folderId) {
+      this.folderId = await this.getOrCreateFolder()
+    }
+
+    // 查找已研究数据文件
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${this.REVIEWED_FILE_NAME}' and '${this.folderId}' in parents`,
+      {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      }
+    )
+
+    const searchResult = await searchResponse.json()
+    
+    if (searchResult.files?.length) {
+      // 删除文件
+      await fetch(
+        `https://www.googleapis.com/drive/v3/files/${searchResult.files[0].id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${this.token}`
+          }
+        }
+      )
+      console.log('已删除已研究数据文件')
+      return true
+    }
+    
+    return false
+  }
 }
 
 export const googleDriveService = new GoogleDriveService() 
