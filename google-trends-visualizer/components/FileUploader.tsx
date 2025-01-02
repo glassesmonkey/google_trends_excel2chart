@@ -6,8 +6,6 @@ import { useStore } from '../store'
 import { TrendsData, ComparisonPoint, UploadState } from '../types'
 
 const GPTS_DAILY_VOLUME = 5000 // GPTs 基准搜索量
-const BATCH_SIZE = 5 // 批量处理大小
-const MAX_RETRIES = 3 // 最大重试次数
 
 export default function FileUploader() {
   const { addTrendsData } = useStore()
@@ -69,7 +67,7 @@ export default function FileUploader() {
       // 从表头的下一行开始处理数据
       const dataStartIndex = headerIndex + 1
       const comparisonData: ComparisonPoint[] = lines.slice(dataStartIndex)
-        .map((line, index) => {
+        .map(line => {
           if (!line.trim()) return null
           
           const cells = parseCsvLine(line)
