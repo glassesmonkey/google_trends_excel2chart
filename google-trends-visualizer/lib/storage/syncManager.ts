@@ -83,15 +83,15 @@ export class SyncManager {
   }
 
   // 初始化数据
-  async initializeData() {
+  async initializeData(options: { reviewed?: boolean } = {}) {
     try {
       console.log('开始初始化数据...')
       
       // 1. 清空本地数据
       await indexedDBService.clear()
       
-      // 2. 获取所有远程数据
-      const remoteData = await supabaseService.getData({})
+      // 2. 获取远程数据（根据 reviewed 状态筛选）
+      const remoteData = await supabaseService.getData(options)
       
       // 3. 保存到本地
       if (remoteData.length > 0) {

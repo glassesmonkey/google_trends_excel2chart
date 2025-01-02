@@ -42,6 +42,7 @@ export class SupabaseService {
     let query = supabase
       .from('trends_data')
       .select('*')
+      .order('last_week_volume', { ascending: false })
 
     if (typeof options.reviewed === 'boolean') {
       query = query.eq('reviewed', options.reviewed)
@@ -51,13 +52,10 @@ export class SupabaseService {
       query = query.ilike('target_keyword', `%${options.searchTerm}%`)
     }
 
-    if (options.limit) {
-      query = query.limit(options.limit)
-    }
-
-    if (options.offset) {
-      query = query.range(options.offset, options.offset + (options.limit || 10) - 1)
-    }
+    // 默认每页1000条
+    const pageSize = options.limit || 1000
+    const offset = options.offset || 0
+    query = query.range(offset, offset + pageSize - 1)
 
     const { data, error } = await query
 

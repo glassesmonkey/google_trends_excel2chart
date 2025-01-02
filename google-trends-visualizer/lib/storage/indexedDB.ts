@@ -81,6 +81,9 @@ export class IndexedDBService {
       )
     }
 
+    // 按 lastWeekVolume 降序排序
+    data.sort((a, b) => (b.lastWeekVolume || 0) - (a.lastWeekVolume || 0))
+
     // 分页
     if (options.offset || options.limit) {
       const start = options.offset || 0

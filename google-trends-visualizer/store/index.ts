@@ -10,10 +10,13 @@ interface Store {
   showReviewed: boolean
   isLoading: boolean
   loadingText: string
+  currentPage: number
+  hasMore: boolean
   setTrendsData: (data: TrendsData[]) => void
   addTrendsData: (data: TrendsData[]) => Promise<void>
   setUploadState: (state: Partial<UploadState>) => void
   loadData: () => Promise<void>
+  loadNextPage: () => Promise<void>
   updateReviewStatus: (ids: string[], reviewed: boolean) => Promise<void>
   setShowReviewed: (show: boolean) => Promise<void>
   clearReviewedData: () => Promise<void>
@@ -29,16 +32,51 @@ export const useStore = create<Store>((set, get) => ({
   showReviewed: false,
   isLoading: false,
   loadingText: '',
+  currentPage: 0,
+  hasMore: true,
 
   setLoading: (isLoading: boolean, text: string = '') => 
     set({ isLoading, loadingText: text }),
 
   setShowReviewed: async (show) => {
-    set({ showReviewed: show })
+    set({ showReviewed: show, currentPage: 0, hasMore: true })
     try {
       set({ isLoading: true, loadingText: '正在加载数据...' })
-      const data = await indexedDBService.getData({ reviewed: show })
-      set({ trendsData: data })
+      const data = await indexedDBService.getData({ 
+        reviewed: show,
+        limit: 1000,
+        offset: 0
+      })
+      set({ trendsData: data, hasMore: data.length === 1000 })
+    } finally {
+      set({ isLoading: false, loadingText: '' })
+    }
+  },
+
+  loadNextPage: async () => {
+    const { currentPage, showReviewed, isLoading, hasMore } = get()
+    if (isLoading || !hasMore) return
+
+    try {
+      set({ isLoading: true, loadingText: '正在加载更多数据...' })
+      const nextPage = currentPage + 1
+      const offset = nextPage * 1000
+
+      const newData = await indexedDBService.getData({ 
+        reviewed: showReviewed,
+        limit: 1000,
+        offset
+      })
+
+      if (newData.length > 0) {
+        set(state => ({ 
+          trendsData: [...state.trendsData, ...newData],
+          currentPage: nextPage,
+          hasMore: newData.length === 1000
+        }))
+      } else {
+        set({ hasMore: false })
+      }
     } finally {
       set({ isLoading: false, loadingText: '' })
     }
@@ -91,10 +129,22 @@ export const useStore = create<Store>((set, get) => ({
 
   loadData: async () => {
     try {
-      set({ isLoading: true, loadingText: '正在加载数据...' })
-      await syncManager.initializeData()
-      const data = await indexedDBService.getData({ reviewed: get().showReviewed })
-      set({ trendsData: data })
+      set({ 
+        isLoading: true, 
+        loadingText: '正在加载数据...',
+        currentPage: 0,
+        hasMore: true
+      })
+      await syncManager.initializeData({ reviewed: false })
+      const data = await indexedDBService.getData({ 
+        reviewed: false,
+        limit: 1000,
+        offset: 0
+      })
+      set({ 
+        trendsData: data,
+        hasMore: data.length === 1000
+      })
       // 启动自动同步
       syncManager.startAutoSync()
     } finally {
