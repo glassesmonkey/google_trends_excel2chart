@@ -1,1 +1,6 @@
-{}
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "idb": "^8.0.1"
+  }
+}

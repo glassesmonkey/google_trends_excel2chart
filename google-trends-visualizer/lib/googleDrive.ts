@@ -6,6 +6,9 @@ class GoogleDriveService {
   private token: string | null = null
   private folderId: string | null = null
   private tokenExpiry: number | null = null
+  private BATCH_SIZE = 100
+  private MAX_RETRIES = 3
+  private RETRY_DELAY = 1000
   
   private UNREVIEWED_FILE_NAME = 'trends_data.json'
   private REVIEWED_FILE_NAME = 'reviewed_trends_data.json'
@@ -183,7 +186,7 @@ class GoogleDriveService {
     const mergedData = [...filteredExistingData, ...filteredData].reduce((acc: TrendsData[], current) => {
       const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
       if (!exists) {
-        console.log(`添加新数据: ${current.targetKeyword}, reviewed: ${current.reviewed}`)
+        //console.log(`添加新数据: ${current.targetKeyword}, reviewed: ${current.reviewed}`)
         acc.push({
           ...current,
           reviewed: Boolean(current.reviewed)
@@ -355,7 +358,7 @@ class GoogleDriveService {
       const exists = acc.find(item => item.id === current.id)
       if (!exists) {
         // 确保 reviewed 字段被保留
-        console.log(`添加新数据: ${current.id} (${current.targetKeyword}), reviewed: ${current.reviewed}`)
+        //console.log(`添加新数据: ${current.id} (${current.targetKeyword}), reviewed: ${current.reviewed}`)
         acc.push({
           ...current,
           reviewed: Boolean(current.reviewed) // 确保 reviewed 是布尔值
@@ -393,6 +396,46 @@ class GoogleDriveService {
     return mergedData
   }
 
+  private async withRetry<T>(
+    operation: () => Promise<T>,
+    retries: number = this.MAX_RETRIES,
+    delay: number = this.RETRY_DELAY
+  ): Promise<T> {
+    try {
+      return await operation()
+    } catch (error) {
+      console.error('操作失败，准备重试:', error)
+      if (retries === 0) throw error
+      await new Promise(resolve => setTimeout(resolve, delay))
+      return this.withRetry(operation, retries - 1, delay * 2)
+    }
+  }
+
+  private async saveDataInBatches(data: TrendsData[], fileName: string) {
+    const batches = []
+    for (let i = 0; i < data.length; i += this.BATCH_SIZE) {
+      batches.push(data.slice(i, i + this.BATCH_SIZE))
+    }
+
+    console.log(`开始批量保存数据: 总数据量 ${data.length}, 分成 ${batches.length} 批`)
+    
+    let allSavedData: TrendsData[] = []
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i]
+      console.log(`处理第 ${i + 1}/${batches.length} 批，数据量: ${batch.length}`)
+      
+      const savedData = await this.withRetry(() => this.saveToFile(batch, fileName))
+      allSavedData = [...allSavedData, ...savedData]
+      
+      // 添加小延迟避免请求过快
+      if (i < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    }
+
+    return allSavedData
+  }
+
   async saveDataWithReviewedStatus(data: TrendsData[]) {
     const reviewedData = data.filter(item => item.reviewed)
     const unreviewedData = data.filter(item => !item.reviewed)
@@ -403,66 +446,26 @@ class GoogleDriveService {
       unreviewedCount: unreviewedData.length
     })
 
-    // 获取现有的已研究数据
-    const existingReviewedData = await this.loadFromFile(this.REVIEWED_FILE_NAME)
-    // 获取现有的未研究数据
-    const existingUnreviewedData = await this.loadFromFile(this.UNREVIEWED_FILE_NAME)
+    // 分批保存已研究数据
+    console.log('开始保存已研究数据...')
+    const savedReviewedData = await this.saveDataInBatches(reviewedData, this.REVIEWED_FILE_NAME)
+    
+    // 分批保存未研究数据
+    console.log('开始保存未研究数据...')
+    const savedUnreviewedData = await this.saveDataInBatches(unreviewedData, this.UNREVIEWED_FILE_NAME)
 
-    // 合并已研究数据
-    const mergedReviewedData = [...existingReviewedData, ...reviewedData].reduce((acc: TrendsData[], current) => {
-      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
-      if (!exists) {
-        acc.push(current)
-      } else {
-        // 如果数据已存在，使用较新的数据
-        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
-        if (current.timestamp > exists.timestamp) {
-          acc[index] = current
-        }
-      }
-      return acc
-    }, [])
-
-    // 处理未研究数据：移除已被标记为已研究的数据
-    const reviewedKeywords = new Set(mergedReviewedData.map(item => item.targetKeyword))
-    const filteredUnreviewedData = existingUnreviewedData.filter(item => 
-      !reviewedKeywords.has(item.targetKeyword)
-    )
-
-    // 合并未研究数据（排除已研究的）
-    const mergedUnreviewedData = [...filteredUnreviewedData, ...unreviewedData].reduce((acc: TrendsData[], current) => {
-      // 如果关键词已经在已研究数据中，跳过
-      if (reviewedKeywords.has(current.targetKeyword)) {
-        return acc
-      }
-      
-      const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
-      if (!exists) {
-        acc.push(current)
-      } else {
-        // 如果数据已存在，使用较新的数据
-        const index = acc.findIndex(item => item.targetKeyword === current.targetKeyword)
-        if (current.timestamp > exists.timestamp) {
-          acc[index] = current
-        }
-      }
-      return acc
-    }, [])
-
-    console.log('数据处理结果:', {
-      reviewedCount: mergedReviewedData.length,
-      unreviewedCount: mergedUnreviewedData.length,
-      reviewedKeywords: mergedReviewedData.map(d => d.targetKeyword),
-      unreviewedKeywords: mergedUnreviewedData.map(d => d.targetKeyword)
+    console.log('数据保存完成:', {
+      savedReviewedCount: savedReviewedData.length,
+      savedUnreviewedCount: savedUnreviewedData.length
     })
 
-    // 保存已研究数据
-    await this.saveToFile(mergedReviewedData, this.REVIEWED_FILE_NAME)
-    // 保存未研究数据
-    await this.saveToFile(mergedUnreviewedData, this.UNREVIEWED_FILE_NAME)
+    return {
+      reviewedData: savedReviewedData,
+      unreviewedData: savedUnreviewedData
+    }
   }
 
-  private async saveToFile(newData: TrendsData[], fileName: string) {
+  private async saveToFile(data: TrendsData[], fileName: string): Promise<TrendsData[]> {
     await this.checkAndRefreshToken()
     
     if (!this.folderId) {
@@ -473,7 +476,7 @@ class GoogleDriveService {
     const existingData = await this.loadFromFile(fileName)
     
     // 合并数据，使用 targetKeyword 作为唯一标识符
-    const mergedData = [...existingData, ...newData].reduce((acc: TrendsData[], current) => {
+    const mergedData = [...existingData, ...data].reduce((acc: TrendsData[], current) => {
       const exists = acc.find(item => item.targetKeyword === current.targetKeyword)
       if (!exists) {
         acc.push(current)
@@ -489,59 +492,59 @@ class GoogleDriveService {
 
     const fileContent = JSON.stringify(mergedData, null, 2)
 
-    // 查找现有文件
-    const searchResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${this.folderId}' in parents`,
-      {
-        headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
-      }
-    )
-
-    const searchResult = await searchResponse.json()
-    
-    if (searchResult.files?.length) {
-      // 更新现有文件
-      await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${searchResult.files[0].id}?uploadType=media`,
+    // 使用重试机制保存文件
+    await this.withRetry(async () => {
+      const searchResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${this.folderId}' in parents`,
         {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${this.token}`,
-            'Content-Type': 'application/json'
-          },
-          body: fileContent
-        }
-      )
-    } else {
-      // 创建新文件
-      const metadata = {
-        name: fileName,
-        parents: [this.folderId]
-      }
-
-      const form = new FormData()
-      form.append(
-        'metadata',
-        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
-      )
-      form.append(
-        'file',
-        new Blob([fileContent], { type: 'application/json' })
-      )
-
-      await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        {
-          method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.token}`
-          },
-          body: form
+          }
         }
       )
-    }
+
+      const searchResult = await searchResponse.json()
+      
+      if (searchResult.files?.length) {
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${searchResult.files[0].id}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${this.token}`,
+              'Content-Type': 'application/json'
+            },
+            body: fileContent
+          }
+        )
+      } else {
+        const metadata = {
+          name: fileName,
+          parents: [this.folderId]
+        }
+
+        const form = new FormData()
+        form.append(
+          'metadata',
+          new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+        )
+        form.append(
+          'file',
+          new Blob([fileContent], { type: 'application/json' })
+        )
+
+        await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.token}`
+            },
+            body: form
+          }
+        )
+      }
+    })
 
     return mergedData
   }

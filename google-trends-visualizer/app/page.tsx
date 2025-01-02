@@ -5,7 +5,6 @@ import { useStore } from '../store'
 import FileUploader from '../components/FileUploader'
 import TrendsChart from '../components/TrendsChart'
 import { useInView } from 'react-intersection-observer'
-import { googleDriveService } from '../lib/googleDrive'
 import { calculateFreshnessScore } from '../utils/calculations'
 
 const ITEMS_PER_PAGE = 12
@@ -16,16 +15,13 @@ type SortOrder = 'asc' | 'desc'
 export default function Home() {
   const { 
     trendsData, 
-    isAuthenticated, 
-    setAuthenticated, 
-    loadFromDrive,
-    updateTrendsData,
+    loadData,
+    updateReviewStatus,
     showReviewed,
     setShowReviewed,
     clearReviewedData,
     isLoading,
-    loadingText,
-    logout
+    loadingText
   } = useStore()
   
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
@@ -90,51 +86,10 @@ export default function Home() {
     }))
   )
 
-  // 处理 Google Drive 认证
+  // 处理认证
   useEffect(() => {
-    const initGoogleDrive = async () => {
-      // 检查 URL 中是否有访问令牌
-      const hash = window.location.hash
-      if (hash) {
-        const params = new URLSearchParams(hash.substring(1))
-        const accessToken = params.get('access_token')
-        const expiresIn = parseInt(params.get('expires_in') || '3600')
-        
-        if (accessToken) {
-          try {
-            console.log('Setting new token from URL')
-            googleDriveService.setToken(accessToken, expiresIn)
-            setAuthenticated(true)
-            await loadFromDrive()
-            // 清除 URL 中的令牌
-            window.history.replaceState({}, '', window.location.pathname)
-            return
-          } catch (error) {
-            console.error('Google Drive 认证失败:', error)
-          }
-        }
-      }
-
-      // 尝试恢复已保存的凭证
-      console.log('Trying to restore token')
-      if (googleDriveService.restoreToken()) {
-        console.log('Token restored successfully')
-        setAuthenticated(true)
-        try {
-          await loadFromDrive()
-        } catch (error) {
-          console.error('加载 Drive 数据失败:', error)
-          // 如果加载失败，可能是 token 失效
-          setAuthenticated(false)
-        }
-      } else {
-        console.log('No valid token found')
-        setAuthenticated(false)
-      }
-    }
-
-    initGoogleDrive()
-  }, [setAuthenticated, loadFromDrive])
+    loadData()
+  }, [loadData])
 
   // 无限滚动
   useEffect(() => {
@@ -142,11 +97,6 @@ export default function Home() {
       setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, trendsData.length))
     }
   }, [inView, trendsData.length, displayCount])
-
-  // 处理登录
-  const handleLogin = () => {
-    window.location.href = googleDriveService.getAuthUrl()
-  }
 
   // 处理排序变更
   const handleSortChange = (field: SortField) => {
@@ -180,7 +130,7 @@ export default function Home() {
   // 标记为已研究
   const handleMarkAsReviewed = async () => {
     if (selectedIds.length === 0) return
-    await updateTrendsData(selectedIds, { reviewed: true })
+    await updateReviewStatus(selectedIds, true)
     setSelectedIds([])
   }
 
@@ -192,7 +142,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 md:p-8 font-[family-name:var(--font-geist-sans)]">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 font-[family:var(--font-geist-sans)]">
       <main className="max-w-[1920px] mx-auto">
         {isLoading && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -207,22 +157,22 @@ export default function Home() {
           <h1 className="text-2xl font-bold">
             Google Trends Visualizer
           </h1>
-          <div className="flex items-center gap-4">
-            {!isAuthenticated ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowReviewed(!showReviewed)}
+              className={`px-4 py-2 rounded-full border transition-colors ${
+                showReviewed ? 'bg-green-500 text-white' : 'hover:bg-gray-50'
+              }`}
+            >
+              {showReviewed ? '查看未研究' : '查看已研究'}
+            </button>
+            {showReviewed && (
               <button
-                onClick={handleLogin}
-                className="px-4 py-2 bg-blue-500 text-white rounded-full
-                        hover:bg-blue-600 transition-colors"
+                onClick={handleClearReviewed}
+                className="px-4 py-2 bg-red-500 text-white rounded-full
+                        hover:bg-red-600 transition-colors"
               >
-                连接 Google Drive
-              </button>
-            ) : (
-              <button
-                onClick={logout}
-                className="px-4 py-2 bg-gray-500 text-white rounded-full
-                        hover:bg-gray-600 transition-colors"
-              >
-                退出登录
+                清除已研究
               </button>
             )}
           </div>
@@ -286,16 +236,6 @@ export default function Home() {
             >
               所有数据
             </button>
-            
-            {isAuthenticated && (
-              <button
-                onClick={handleClearReviewed}
-                className="px-4 py-2 rounded-lg border bg-red-500 text-white 
-                         hover:bg-red-600 transition-colors"
-              >
-                清除已研究数据
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-4 ml-auto">

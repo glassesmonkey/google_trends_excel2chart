@@ -38,12 +38,12 @@ export default function TrendsChart({ data }: TrendsChartProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<echarts.ECharts | null>(null)
 
-  console.log('TrendsChart received data:', {
-    fullData: data,
-    targetKeyword: data?.targetKeyword,
-    comparisonDataLength: data?.comparisonData?.length,
-    firstComparisonPoint: data?.comparisonData?.[0],
-  })
+  // console.log('TrendsChart received data:', {
+  //   fullData: data,
+  //   targetKeyword: data?.targetKeyword,
+  //   comparisonDataLength: data?.comparisonData?.length,
+  //   firstComparisonPoint: data?.comparisonData?.[0],
+  // })
 
   // 计算月平均搜索量
   const averageMonthlyVolume = Math.round(
@@ -52,11 +52,11 @@ export default function TrendsChart({ data }: TrendsChartProps) {
   )
 
   // 在调用 calculateFreshnessScore 之前添加调试日志
-  console.log('TrendsData being passed to calculateFreshnessScore:', {
-    fullData: data,
-    keyword: data?.targetKeyword,
-    hasData: Boolean(data?.comparisonData?.length)
-  })
+  // console.log('TrendsData being passed to calculateFreshnessScore:', {
+  //   fullData: data,
+  //   keyword: data?.targetKeyword,
+  //   hasData: Boolean(data?.comparisonData?.length)
+  // })
 
   const freshnessScore = calculateFreshnessScore(data.comparisonData)
 
