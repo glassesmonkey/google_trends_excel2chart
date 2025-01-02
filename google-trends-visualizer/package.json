@@ -11,6 +11,7 @@
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
     "@googleapis/drive": "^8.14.0",
+    "@supabase/supabase-js": "^2.39.7",
     "echarts": "^5.5.1",
     "idb": "^8.0.1",
     "next": "15.1.2",
