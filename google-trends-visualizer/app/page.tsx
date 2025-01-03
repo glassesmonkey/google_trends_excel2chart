@@ -6,6 +6,7 @@ import FileUploader from '../components/FileUploader'
 import TrendsChart from '../components/TrendsChart'
 import { useInView } from 'react-intersection-observer'
 import { calculateFreshnessScore } from '../utils/calculations'
+import PasswordVerify from '../components/PasswordVerify'
 
 const ITEMS_PER_PAGE = 12
 
@@ -24,6 +25,7 @@ export default function Home() {
     loadingText
   } = useStore()
   
+  const [isVerified, setIsVerified] = useState(false)
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortField, setSortField] = useState<SortField>('timestamp')
@@ -78,18 +80,12 @@ export default function Home() {
     return result
   }, [trendsData, searchTerm, sortField, sortOrder])
 
-  console.log('filteredAndSortedData sample:', 
-    filteredAndSortedData.slice(0, 1).map(d => ({
-      id: d.id,
-      keyword: d.targetKeyword,
-      hasComparisonData: Boolean(d.comparisonData?.length)
-    }))
-  )
-
-  // 处理认证
+  // 处理认证和数据加载
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (isVerified) {
+      loadData()
+    }
+  }, [isVerified, loadData])
 
   // 无限滚动
   useEffect(() => {
@@ -139,6 +135,10 @@ export default function Home() {
     if (confirm('确定要删除所有已研究的数据吗？此操作不可恢复。')) {
       await clearReviewedData()
     }
+  }
+
+  if (!isVerified) {
+    return <PasswordVerify onVerified={() => setIsVerified(true)} />
   }
 
   return (
